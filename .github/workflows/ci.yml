@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build-test:
+    name: 🧪 Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------
+      # Checkout
+      # -----------------------------
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # Setup .NET
+      # -----------------------------
+      - name: 🧰 Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # -----------------------------
+      # Restore
+      # -----------------------------
+      - name: 🔍 Restore dependencies
+        run: dotnet restore
+
+      # -----------------------------
+      # Build
+      # -----------------------------
+      - name: 🧱 Build solution
+        run: dotnet build --no-restore --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # -----------------------------
+      # Tests + Coverage
+      # -----------------------------
+      - name: 🧪 Run tests with coverage
+        run: >
+          dotnet test
+          --no-build
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      # -----------------------------
+      # Publish Coverage
+      # -----------------------------
+      - name: 📊 Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+
+  docker:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Docker build
+        run: docker build -t task-manager-api:ci .
+
